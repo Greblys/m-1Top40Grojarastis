@@ -85,7 +85,7 @@ if __name__ == "__main__":
     )
   ).execute()
 
-  print "New playlist id: %s" % playlists_insert_response["id"]
+  newPlaylist = playlists_insert_response["id"]
 
   #Retrieve songs from M-1
   songs = []
@@ -96,16 +96,36 @@ if __name__ == "__main__":
 
   #Search songs on Youtube
   videos = []
-  try:
-    search_response = youtube.search().list(
-      q="Felix Jaehn Ain't Nobody (Loves Me Better) ft. Jasmine Thompson",
-      part="id,snippet",
-      maxResults=1,
-      type="video",
-    ).execute()
+  for song in songs:
+    try:
+      search_response = youtube.search().list(
+        q=song,
+        part="id",
+        maxResults=1,
+        type="video",
+      ).execute()
 
-    videos += [search_response.get("items", [])[0]["id"]["videoId"]]
-  except HttpError, e:
-    print "An HTTP error %d occurred:\n%s" % (e.resp.status, e.content)
+      videos += [search_response.get("items", [])[0]["id"]]
+    except HttpError, e:
+      print "An HTTP error %d occurred:\n%s" % (e.resp.status, e.content)
+      exit()
 
-  #Add them to playlist
+  #Add them to playlist from 40th to 1st
+  for i, video in enumerate(reversed(videos)):
+    try:
+      youtube.playlistItems().insert(
+        part="snippet,contentDetails",
+        body=dict(
+          snippet=dict(
+            playlistId=newPlaylist,
+            resourceId=video
+          ),
+          contentDetails=dict(
+            note="%d-a vieta" % i,
+          )
+        )
+      ).execute()
+    except HttpError, e:
+      print "Failed to add video %s to playlist %s\n Error %d occured: %s" \
+            % (video, newPlaylist, e.resp.status, e.content)
+      exit()
