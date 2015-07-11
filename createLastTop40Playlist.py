@@ -3,12 +3,15 @@
 import httplib2
 import os
 import sys
+import urllib2
+import re
 
 from apiclient.discovery import build
 from apiclient.errors import HttpError
 from oauth2client.client import flow_from_clientsecrets
 from oauth2client.file import Storage
 from oauth2client.tools import argparser, run_flow
+from bs4 import BeautifulSoup
 
 # The CLIENT_SECRETS_FILE variable specifies the name of a file that contains
 # the OAuth 2.0 information for this application, including its client_id and
@@ -46,6 +49,8 @@ YOUTUBE_READ_WRITE_SCOPE = "https://www.googleapis.com/auth/youtube"
 YOUTUBE_API_SERVICE_NAME = "youtube"
 YOUTUBE_API_VERSION = "v3"
 
+TOP40_URL = "http://www.m-1.fm/top40/"
+
 def lastSaturday():
   return "2014-07-12"
 
@@ -82,7 +87,12 @@ if __name__ == "__main__":
 
   print "New playlist id: %s" % playlists_insert_response["id"]
 
-  #Retrieve songs from http://www.m-1.fm/top40/
+  #Retrieve songs from M-1
+  songs = []
+  soup = BeautifulSoup(urllib2.urlopen(TOP40_URL).read(), 'html.parser')
+  for song in soup.find(id="topvote").find_all(id=re.compile("^title_*")):
+    songs += [song.text]
+  songs = songs[:40] #No candidates to the top
 
   #Search songs on Youtube
   videos = []
