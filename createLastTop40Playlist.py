@@ -10,7 +10,6 @@ from oauth2client.client import flow_from_clientsecrets
 from oauth2client.file import Storage
 from oauth2client.tools import argparser, run_flow
 
-
 # The CLIENT_SECRETS_FILE variable specifies the name of a file that contains
 # the OAuth 2.0 information for this application, including its client_id and
 # client_secret. You can acquire an OAuth 2.0 client ID and client secret from
@@ -47,32 +46,56 @@ YOUTUBE_READ_WRITE_SCOPE = "https://www.googleapis.com/auth/youtube"
 YOUTUBE_API_SERVICE_NAME = "youtube"
 YOUTUBE_API_VERSION = "v3"
 
-flow = flow_from_clientsecrets(CLIENT_SECRETS_FILE,
+def lastSaturday():
+  return "2014-07-12"
+
+if __name__ == "__main__":
+
+  #Create playlist
+  flow = flow_from_clientsecrets(CLIENT_SECRETS_FILE,
   message=MISSING_CLIENT_SECRETS_MESSAGE,
   scope=YOUTUBE_READ_WRITE_SCOPE)
 
-storage = Storage("%s-oauth2.json" % sys.argv[0])
-credentials = storage.get()
+  storage = Storage("%s-oauth2.json" % sys.argv[0])
+  credentials = storage.get()
 
-if credentials is None or credentials.invalid:
-  flags = argparser.parse_args()
-  credentials = run_flow(flow, storage, flags)
+  if credentials is None or credentials.invalid:
+    flags = argparser.parse_args()
+    credentials = run_flow(flow, storage, flags)
 
-youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION,
-  http=credentials.authorize(httplib2.Http()))
+  youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION,
+    http=credentials.authorize(httplib2.Http()))
 
-# This code creates a new, private playlist in the authorized user's channel.
-playlists_insert_response = youtube.playlists().insert(
-  part="snippet,status",
-  body=dict(
-    snippet=dict(
-      title="Test Playlist",
-      description="A private playlist created with the YouTube API v3"
-    ),
-    status=dict(
-      privacyStatus="private"
+  # This code creates a new, private playlist in the authorized user's channel.
+  playlists_insert_response = youtube.playlists().insert(
+    part="snippet,status",
+    body=dict(
+      snippet=dict(
+        title="M-1 TOP 40 Grojarastis " + lastSaturday(),
+        description="M-1 TOP 40 Grojarastis " + lastSaturday()
+      ),
+      status=dict(
+        privacyStatus="private"
+      )
     )
-  )
-).execute()
+  ).execute()
 
-print "New playlist id: %s" % playlists_insert_response["id"]
+  print "New playlist id: %s" % playlists_insert_response["id"]
+
+  #Retrieve songs from http://www.m-1.fm/top40/
+
+  #Search songs on Youtube
+  videos = []
+  try:
+    search_response = youtube.search().list(
+      q="Felix Jaehn Ain't Nobody (Loves Me Better) ft. Jasmine Thompson",
+      part="id,snippet",
+      maxResults=1,
+      type="video",
+    ).execute()
+
+    videos += [search_response.get("items", [])[0]["id"]["videoId"]]
+  except HttpError, e:
+    print "An HTTP error %d occurred:\n%s" % (e.resp.status, e.content)
+
+  #Add them to playlist
