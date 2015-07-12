@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
 
 import httplib2
 import os
@@ -118,7 +119,7 @@ def createPlaylist(api, date, description):
     part="snippet,status",
     body=dict(
       snippet=dict(
-        title="M-1 TOP 40 Grojarastis " + date,
+        title=u"M-1 TOP 40 Grojaraštis " + date,
         description=description
       ),
       status=dict(
