@@ -123,7 +123,7 @@ def createPlaylist(api, date, description):
         description=description
       ),
       status=dict(
-        privacyStatus="private"
+        privacyStatus="public"
       )
     )
   ).execute()

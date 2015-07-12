@@ -2,7 +2,7 @@ __author__ = 'lukas'
 
 import urllib2
 from bs4 import BeautifulSoup
-from createLastTop40Playlist import createFullPlaylist
+from createPlaylist import createFullPlaylist
 
 TOP40_URL = "http://www.m-1.fm/top40/?topid=%s"
 
