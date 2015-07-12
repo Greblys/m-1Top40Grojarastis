@@ -51,12 +51,47 @@ YOUTUBE_API_VERSION = "v3"
 
 TOP40_URL = "http://www.m-1.fm/top40/"
 
-def lastSaturday():
-  return "2014-07-12"
+def searchSong(api, title):
+  """Searches for song video.
 
-if __name__ == "__main__":
+  Args:
+    title: Author and song title
+  Returns
+    ResourceId object returned by Youtube
+  """
+  try:
+    search_response = api.search().list(
+      q=title,
+      part="id",
+      maxResults=1,
+      type="video",
+    ).execute()
 
-  #Create playlist
+    return search_response.get("items", [])[0]["id"]
+  except HttpError, e:
+    print "An HTTP error %d occurred:\n%s" % (e.resp.status, e.content)
+
+def retrieveM1Songs(url):
+  """Parses URL and returns titles of TOP40 songs
+
+  Args:
+    url: address where TOP40 lies
+  Returns:
+    TOP40 date
+    Array with all 40 songs
+  """
+  songs = []
+  soup = BeautifulSoup(urllib2.urlopen(url).read(), 'lxml')
+  for song in soup.find(id="topvote").find_all(id=re.compile("^title_*")):
+    songs += [song.text]
+  return soup.find(attrs={"name": "topid"}).find(selected=True).text, songs[:40] #Remove song candidates
+
+def authorise():
+  """Authorises credentials
+
+  Returns:
+    Youtube data API object
+  """
   flow = flow_from_clientsecrets(CLIENT_SECRETS_FILE,
   message=MISSING_CLIENT_SECRETS_MESSAGE,
   scope=YOUTUBE_READ_WRITE_SCOPE)
@@ -68,64 +103,80 @@ if __name__ == "__main__":
     flags = argparser.parse_args()
     credentials = run_flow(flow, storage, flags)
 
-  youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION,
+  return build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION,
     http=credentials.authorize(httplib2.Http()))
 
-  # This code creates a new, private playlist in the authorized user's channel.
-  playlists_insert_response = youtube.playlists().insert(
+def createPlaylist(api, date):
+  """Creates empty playlist
+
+  Args:
+    api: Youtube API object
+    date: Date when TOP40 happened
+  """
+  playlists_insert_response = api.playlists().insert(
     part="snippet,status",
     body=dict(
       snippet=dict(
-        title="M-1 TOP 40 Grojarastis " + lastSaturday(),
-        description="M-1 TOP 40 Grojarastis " + lastSaturday()
+        title="M-1 TOP 40 Grojarastis " + date,
+        description="M-1 TOP 40 Grojarastis " + date
       ),
       status=dict(
         privacyStatus="private"
       )
     )
   ).execute()
+  return playlists_insert_response["id"]
 
-  newPlaylist = playlists_insert_response["id"]
+def addSongToPlaylist(api, playlist, song, rank):
+  """Append song to the playlist
+
+  Args:
+    api: Youtube API object
+    playlist: Youtube playlist id object
+    song: Youtube video id object
+    rank: Song's rank in TOP40
+  """
+  try:
+    api.playlistItems().insert(
+      part="snippet,contentDetails",
+      body=dict(
+        snippet=dict(
+          playlistId=playlist,
+          resourceId=song
+        ),
+        contentDetails=dict(
+          note="%d-a vieta" % rank,
+        )
+      )
+    ).execute()
+  except HttpError, e:
+    print "Failed to add video %s to playlist %s\n Error %d occured: %s" \
+          % (song, playlist, e.resp.status, e.content)
+
+
+def createFullPlaylist(url):
+  """Creates playlist and fills it with TOP40 songs
+
+  Args:
+    url: TOP40 source
+  """
+  youtube = authorise()
 
   #Retrieve songs from M-1
-  songs = []
-  soup = BeautifulSoup(urllib2.urlopen(TOP40_URL).read(), 'html.parser')
-  for song in soup.find(id="topvote").find_all(id=re.compile("^title_*")):
-    songs += [song.text]
-  songs = songs[:40] #No candidates to the top
+  date, songs = retrieveM1Songs(url)
+  print "Retrieved songs from radio website."
+
+  newPlaylist = createPlaylist(youtube, date)
+  print "Created empty playlist %s." % newPlaylist
 
   #Search songs on Youtube
-  videos = []
-  for song in songs:
-    try:
-      search_response = youtube.search().list(
-        q=song,
-        part="id",
-        maxResults=1,
-        type="video",
-      ).execute()
+  videos = [searchSong(youtube, song) for song in songs]
+  print "Finished songs search."
 
-      videos += [search_response.get("items", [])[0]["id"]]
-    except HttpError, e:
-      print "An HTTP error %d occurred:\n%s" % (e.resp.status, e.content)
-      exit()
+  #Add songs to the playlist
+  for i, video in enumerate(videos):
+    addSongToPlaylist(youtube, newPlaylist, video, i+1)
+  print "Finished adding songs to a playlist."
 
-  #Add them to playlist from 40th to 1st
-  for i, video in enumerate(reversed(videos)):
-    try:
-      youtube.playlistItems().insert(
-        part="snippet,contentDetails",
-        body=dict(
-          snippet=dict(
-            playlistId=newPlaylist,
-            resourceId=video
-          ),
-          contentDetails=dict(
-            note="%d-a vieta" % i,
-          )
-        )
-      ).execute()
-    except HttpError, e:
-      print "Failed to add video %s to playlist %s\n Error %d occured: %s" \
-            % (video, newPlaylist, e.resp.status, e.content)
-      exit()
+if __name__ == "__main__":
+  createFullPlaylist(TOP40_URL)
