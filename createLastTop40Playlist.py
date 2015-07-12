@@ -106,19 +106,20 @@ def authorise():
   return build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION,
     http=credentials.authorize(httplib2.Http()))
 
-def createPlaylist(api, date):
+def createPlaylist(api, date, description):
   """Creates empty playlist
 
   Args:
     api: Youtube API object
     date: Date when TOP40 happened
+    description: Playlist description
   """
   playlists_insert_response = api.playlists().insert(
     part="snippet,status",
     body=dict(
       snippet=dict(
         title="M-1 TOP 40 Grojarastis " + date,
-        description="M-1 TOP 40 Grojarastis " + date
+        description=description
       ),
       status=dict(
         privacyStatus="private"
@@ -166,7 +167,7 @@ def createFullPlaylist(url):
   date, songs = retrieveM1Songs(url)
   print "Retrieved songs from radio website."
 
-  newPlaylist = createPlaylist(youtube, date)
+  newPlaylist = createPlaylist(youtube, date, url)
   print "Created empty playlist %s." % newPlaylist
 
   #Search songs on Youtube
